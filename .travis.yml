@@ -7,5 +7,6 @@ jobs:
   include:
     - script: |
         docker run -it -v ${TRAVIS_BUILD_DIR}:/repo.git -w /repo.git chapel/chapel-gasnet:1.20.0 /bin/bash -c '
-        make install-deps &&
+        apt-get update && apt-get install -y libhdf5-dev libzmq3-dev && pip3 install --user pyzmq numpy &&
+        echo "$(eval $(call add-path,/usr/lib/x86_64-linux-gnu/hdf5/serial/))" > Makefile.paths &&
         make'
