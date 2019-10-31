@@ -17,7 +17,7 @@ else:
     ak.connect()
 
 
-N = 1_000_000
+N = 1000000
 
 
 all_passed = True
