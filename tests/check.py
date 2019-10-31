@@ -20,7 +20,10 @@ else:
 N = 1_000_000
 
 
+all_passed = True
 def pass_fail(f):
+    global all_passed
+    all_passed = all_passed and f
     return ("Passed" if f else "Failed")
 
 def check_arange(N):
@@ -257,3 +260,4 @@ print("check set integer idx = value:", check_set_integer_idx(N))
 
 #ak.disconnect()
 ak.shutdown()
+sys.exit(not all_passed)
