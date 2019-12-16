@@ -13,4 +13,3 @@ jobs:
       run: free -g
     - name: Run a multi-line script
       uses: docker://chapel/chapel:1.20.0
-      run: chpl --version
