@@ -14,6 +14,4 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Run a one-line script
-      run: free -g
-    - name: Run a multi-line script
       run: chpl --version
