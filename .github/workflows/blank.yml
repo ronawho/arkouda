@@ -16,7 +16,7 @@ jobs:
     - name: Run a multi-line script
       run: |
         cd ${GITHUB_WORKSPACE}
-        #apt-get update && apt-get install -y libhdf5-dev libzmq3-dev python3-pip
+        apt-get -q update && apt-get install -y -q libhdf5-dev libzmq3-dev python3-pip
         ls
         pwd
         echo "\$(eval \$(call add-path,/usr/lib/x86_64-linux-gnu/hdf5/serial/))" > Makefile.paths
