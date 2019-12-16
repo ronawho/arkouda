@@ -15,4 +15,4 @@ jobs:
       uses: docker://chapel/chapel:1.20.0
       with:
         entrypoint: /bin/bash
-        args: -c 'apt-get update && apt-get install -y libhdf5-dev libzmq3-dev python3-pip && ARKOUDA_DEVELOPER=true make'
+        args: echo "ARKOUDA_DEVELOPER=true make"
