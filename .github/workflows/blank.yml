@@ -15,4 +15,4 @@ jobs:
       uses: docker://chapel/chapel:1.20.0
       with:
         entrypoint: /bin/bash
-        args: echo "ARKOUDA_DEVELOPER=true make"
+        args: -c 'echo asdf'
