@@ -7,7 +7,7 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: docker://chapel/chapel:1.20.0
+      image: chapel/chapel:1.20.0
 
     steps:
     - uses: actions/checkout@v2
@@ -22,7 +22,7 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: docker://chapel/chapel-gasnet:1.20.0
+      image: docker://chapel/chapel-gasnet
 
     steps:
     - uses: actions/checkout@v2
