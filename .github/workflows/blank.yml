@@ -22,7 +22,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: OSX compile
       run: |
-        brew install hdf5 zeromq chapel@1.20.0
+        brew install hdf5 zeromq chapel
         ARKOUDA_DEVELOPER=true make
 
   gasnet_job:
