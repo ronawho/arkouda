@@ -28,6 +28,15 @@ module CommAggregation {
     }
   }
 
+  /* Creates a copy aggregator (src or dst could be remote). */
+  proc newCopyAggregator(type elemType, param useUnorderedCopy=false) {
+    if CHPL_COMM == "none" || useUnorderedCopy {
+      return new CopyUnorderedAggregator(elemType);
+    } else {
+      return new CopyAggregator(elemType);
+    }
+  }
+
   /*
    * Aggregates copy(ref dst, src). Optimized for when src is local.
    * Not parallel safe and is expected to be created on a per-task basis
@@ -249,6 +258,54 @@ module CommAggregation {
       unorderedCopyWrapper(dst, src);
     }
   }
+
+  /*
+   * Aggregates copy(ref dst, const ref src). Optimized for when either src or
+   * dst is local. If both src and dst are remote the src will be fetched with
+   * a blocking GET first.
+   * Not parallel safe and is expected to be created on a per-task basis
+   * High memory usage since there are per-destination buffers
+   */
+  record CopyAggregator {
+    type elemType;
+    var srcAgg: SrcAggregator(elemType);
+    var dstAgg: DstAggregator(elemType);
+
+    proc deinit() {
+      flush();
+    }
+
+    proc flush() {
+      srcAgg.flush();
+      dstAgg.flush();
+    }
+
+    proc copy(ref dst: elemType, const ref src: elemType) {
+      if dst.locale.id == here.id {
+        srcAgg.copy(dst, src);
+      } else {
+        dstAgg.copy(dst, src);
+      }
+    }
+  }
+
+  /* "Aggregator" that uses unordered copy instead of actually aggregating */
+  pragma "no doc"
+  record CopyUnorderedAggregator {
+    type elemType;
+
+    proc deinit() {
+      flush();
+    }
+    proc flush() {
+      unorderedCopyTaskFence();
+    }
+    inline proc copy(ref dst: elemType, const ref src: elemType) {
+      unorderedCopyWrapper(dst, src);
+    }
+  }
+
+
 
 
   // A remote buffer with lazy allocation
