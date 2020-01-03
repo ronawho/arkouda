@@ -28,6 +28,45 @@ module CommAggregation {
     }
   }
 
+  /* Creates a copy aggregator (src or dst could be remote). */
+  proc newCopyAggregator(type elemType, param useUnorderedCopy=false) {
+    return new CopyAggregator(elemType, useUnorderedCopy);
+  }
+
+  /*
+   * Aggregates copy(ref dst, src). Optimized for when either src or dst is
+   * local. Not parallel safe and is expected to be created on a per-task basis
+   * High memory usage since there are per-destination buffers
+   */
+  record CopyAggregator {
+    type elemType;
+    var srcAgg;
+    var dstAgg;
+
+    proc init(type elemType, param useUnorderedCopy) {
+      this.elemType = elemType;
+      this.srcAgg = newSrcAggregator(elemType, useUnorderedCopy);
+      this.dstAgg = newDstAggregator(elemType, useUnorderedCopy);
+    }
+
+    proc deinit() {
+      flush();
+    }
+
+    proc flush() {
+      srcAgg.flush();
+      dstAgg.flush();
+    }
+
+    proc copy(ref dst: elemType, const ref src: elemType) {
+      if dst.locale.id == here.id {
+        srcAgg.copy(dst, src);
+      } else {
+        dstAgg.copy(dst, src);
+      }
+    }
+  }
+
   /*
    * Aggregates copy(ref dst, src). Optimized for when src is local.
    * Not parallel safe and is expected to be created on a per-task basis
