@@ -23,7 +23,7 @@ module SymArrayDmap
     :arg size: size of domain
     :type size: int
     */
-    proc makeDistDom(size:int) {
+    proc rawMakeDistDom(size:int) {
         select MyDmap
         {
             when Dmap.defaultRectangular {
@@ -43,6 +43,20 @@ module SymArrayDmap
                 halt("Unsupported distribution " + MyDmap:string);
             }
         }
+    }
+
+    type bd = rawMakeDistDom(1).type;
+    var tD: domain(int);
+    var tab: [tD] bd;
+
+    proc makeDistDom(size:int) ref {
+      if !tD.contains(size) {
+	tD += size;
+	const entry = rawMakeDistDom(size);
+	tab[size] = entry;
+      }
+
+      return tab[size];
     }
     
     /* 
