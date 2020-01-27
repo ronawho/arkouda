@@ -1,5 +1,6 @@
 module SipHash {
 
+  require "siphash.h";
   param cROUNDS = 2;
   param dROUNDS = 4;
 
@@ -49,13 +50,18 @@ module SipHash {
     return c;
   }
   
+  use SysCTypes;
+  extern proc siphash(i:c_ptr(uint(8)), inlen:size_t, k:c_ptr(uint(8)), o:c_void_ptr, outlen: size_t): c_int;
+
   proc sipHash64(msg: [] uint(8), D, k: [?kD] uint(8)): uint(64) throws {
     var res = computeSipHash(msg, D, k, 8);
     return res[1];
   }
 
   proc sipHash128(msg: [] uint(8), D, k: [?kD] uint(8)): 2*uint(64) throws {
-    return computeSipHash(msg, D, k, 16);
+    var res: 2*uint(64);
+    siphash(c_ptrTo(msg[D.low]), D.size:size_t, c_ptrTo(k[kD.low]), c_ptrTo(res[1]), 16:size_t);
+    return res;
   }
   
   private proc computeSipHash(msg: [] uint(8), D,  k: [?kD] uint(8), param outlen: int) throws {

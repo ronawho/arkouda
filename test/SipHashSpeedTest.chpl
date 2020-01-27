@@ -16,7 +16,7 @@ proc main() {
   const DD2: domain(1) dmapped Block(boundingBox=D2) = D2;
   var hashes: [DD2] 2*uint(64);
   var t = getCurrentTime();
-  forall (h, i) in zip(hashes, DD2) with (const key = defaultSipHashKey) {
+  forall (h, i) in zip(hashes, DD2) with (var key = defaultSipHashKey) {
     h = sipHash128(buf, i*INPUTSIZE..#INPUTSIZE, key);
   }
   var elapsed = getCurrentTime() - t;
