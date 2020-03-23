@@ -95,6 +95,8 @@ module JoinEqWithDTMsg
         var resCounters: [PrivateSpace] atomic int;
         // actual number of results per locale
         var locNumResults: [PrivateSpace] int;
+        // a local instance so we can do an optimied scan
+        var localLocNumResults: [LocaleSpace] int;
         
         coforall loc in Locales {
             on loc {
@@ -156,19 +158,25 @@ module JoinEqWithDTMsg
                     } // if more space in result list
                 } // forall i
                 // set locNumResults to correct value
-                if (resCounters[here.id].read() > resLimitPerLocale) {
+                const resCounter = resCounters[here.id].read();
+                if (resCounter > resLimitPerLocale) {
                     locNumResults[here.id] = resLimitPerLocale;
+                    localLocNumResults[here.id] = resLimitPerLocale;
                 }
                 else {
-                    locNumResults[here.id] = resCounters[here.id].read();
+                    locNumResults[here.id] = resCounter;
+                    localLocNumResults[here.id] = resCounter;
                 }
             } // on loc
         } // coforall loc
 
-        // +scan for all the local result ends
-        // last value should be total results
-        var resEnds: [PrivateSpace] int = + scan locNumResults;
-        var numResults: int = resEnds[resEnds.domain.high];
+        // +scan for all the local result ends.
+        var localResEnds = + scan localLocNumResults;
+        var resEnds: [PrivateSpace] int;
+        coforall loc in Locales do on loc do
+          resEnds[here.id] = localResEnds[here.id];
+
+        var numResults: int = localResEnds[localResEnds.domain.high];
         //writeln(resEnds);
         writeln("numResults = ",numResults);
         
