@@ -33,6 +33,9 @@ jobs:
     strategy:
       matrix:
         image: [chapel, chapel-gasnet-smp]
+        include:
+        - image: chapel
+          ARKOUDA_DEVELOPER: true
     container:
       image: chapel/${{matrix.image}}:1.22.0
     steps:
