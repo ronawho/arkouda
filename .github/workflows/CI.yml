@@ -33,9 +33,10 @@ jobs:
     strategy:
       matrix:
         image: [chapel, chapel-gasnet-smp]
+        build_options: [ARKOUDA_QUICK_COMPILE=true]
         include:
         - image: chapel
-          ARKOUDA_DEVELOPER: true
+          build_options: ARKOUDA_DEVELOPER=true
     container:
       image: chapel/${{matrix.image}}:1.22.0
     steps:
@@ -46,7 +47,7 @@ jobs:
         echo "\$(eval \$(call add-path,/usr/lib/x86_64-linux-gnu/hdf5/serial/))" > Makefile.paths
     - name: Build/Install Arkouda
       run: |
-        make
+        chapel/${{matrix.build_options}} make
         python3 -m pip install -e .[dev]
     - name: Arkouda make check
       run: |
