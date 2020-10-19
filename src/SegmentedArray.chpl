@@ -17,6 +17,11 @@ module SegmentedArray {
   private config const DEBUG = false;
   private config param useHash = true;
   param SegmentedArrayUseHash = useHash;
+
+  enum StringGatherMode { manualSrcDstAgg, unorderedCopy, copyAgg }
+
+  private config const stringGatherMode: StringGatherMode =
+    try! getEnv('ARKOUDA_SERVER_STRING_GATHER_MODE', 'unorderedCopy'):StringGatherMode;
   
   class OutOfBoundsError: Error {}
 
@@ -220,7 +225,7 @@ module SegmentedArray {
       var gatheredVals = makeDistArray(retBytes, uint(8));
       // For comm layer with poor small-message performance, use aggregation
       // at the expense of memory. Otherwise, unorderedCopy is faster and smaller.
-      if !(CHPL_COMM == 'none' || CHPL_COMM == 'ugni') {
+      if stringGatherMode == StringGatherMode.manualSrcDstAgg {
         // Compute the src index for each byte in gatheredVals
         /* For performance, we will do this with a scan, so first we need an array
            with the difference in index between the current and previous byte. For
@@ -244,7 +249,7 @@ module SegmentedArray {
         forall (v, si) in zip(gatheredVals, srcIdx) with (var agg = newSrcAggregator(uint(8))) {
           agg.copy(v, va[si]);
         }
-      } else {
+      } else if stringGatherMode == StringGatherMode.unorderedCopy {
         if DEBUG { writeln("Using unorderedCopy"); stdout.flush(); }
         ref va = values.a;
         // Copy string data to gathered result
@@ -254,6 +259,17 @@ module SegmentedArray {
             unorderedCopy(gatheredVals[go+pos], va[oa[idx]+pos]);
           }
         }
+      } else if stringGatherMode == StringGatherMode.copyAgg {
+        if DEBUG { writeln("Using CopyAgg"); stdout.flush(); }
+        ref va = values.a;
+        // Copy string data to gathered result
+        forall (go, gl, idx) in zip(gatheredOffsets, gatheredLengths, iv) with (var agg = newCopyAggregator(uint(8))) {
+          for pos in 0..#gl {
+            agg.copy(gatheredVals[go+pos], va[oa[idx]+pos]);
+          }
+        }
+      } else {
+        halt("unexpected stringGatherMode");
       }
       if v {writeln(getCurrentTime() - t1, " seconds"); stdout.flush();}
       return (gatheredOffsets, gatheredVals);
