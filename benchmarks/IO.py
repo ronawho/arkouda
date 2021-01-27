@@ -33,12 +33,9 @@ def time_ak_write_read(N_per_locale, trials, dtype, path, seed):
     avgwrite = sum(writetimes) / trials
     avgread = sum(readtimes) / trials
 
-    print("Write times: min = {:.4f} sec, max = {:.4f} sec, avg = {:.4f} sec".format(min(writetimes), max(writetimes), avgwrite))
-    print("Read times : min = {:.4f} sec, max = {:.4f} sec, avg = {:.4f} sec".format(min(readtimes), max(readtimes), avgread))
-
     nb = a.size * a.itemsize
-    print("Write rates: min = {:.4f} GiB/sec, max = {:.4f} GiB/sec, avg = {:.4f} GiB/sec".format(nb/2**30/max(writetimes), nb/2**30/min(writetimes), nb/2**30/avgwrite))
-    print("Read rates : min = {:.4f} GiB/sec, max = {:.4f} GiB/sec, avg = {:.4f} GiB/sec".format(nb/2**30/max(readtimes), nb/2**30/min(readtimes), nb/2**30/avgread))
+    print("write: {:.2f} GiB/s ({:.2f}s)".format(nb/2**30/avgwrite, avgwrite))
+    print("read: {:.4f} GiB/s ({:.2f}s)".format(nb/2**30/avgread, avgread))
 
 def check_correctness(dtype, path, seed):
     N = 10**4
