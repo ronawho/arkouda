@@ -460,6 +460,9 @@ module GenSymIO {
         var signFlags: [filedom] bool;
         var rnames: string;
         for dsetName in dsetnames do {
+            use TestBase;
+            var d: Diags;
+            d.start();
             for (i, fname) in zip(filedom, filenames) {
                 try {
                     (segArrayFlags[i], dclasses[i], bytesizes[i], signFlags[i]) = get_dtype(fname, dsetName);
@@ -484,6 +487,8 @@ module GenSymIO {
                     return try! "Error: unknown cause";
                 }
             }
+            d.stop("readAllHdfMsg get_dtype");
+
             const isSegArray = segArrayFlags[filedom.first];
             const dataclass = dclasses[filedom.first];
             const bytesize = bytesizes[filedom.first];
@@ -547,7 +552,9 @@ module GenSymIO {
                     gsLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                                   "Initialized int entry for dataset %s".format(dsetName));
 
+                    d.start();
                     read_files_into_distributed_array(entryInt.a, subdoms, filenames, dsetName);
+                    d.stop("readAllHdfMsg read_files_into_distributed_array");
                     var rname = st.nextName();
                     
                     /*
