@@ -462,7 +462,9 @@ module GenSymIO {
         for dsetName in dsetnames do {
             for (i, fname) in zip(filedom, filenames) {
                 try {
-                    (segArrayFlags[i], dclasses[i], bytesizes[i], signFlags[i]) = get_dtype(fname, dsetName);
+                   on Locales[i % numLocales] {
+                     (segArrayFlags[i], dclasses[i], bytesizes[i], signFlags[i]) = get_dtype(fname.localize(), dsetName.localize());
+                   }
                 } catch e: FileNotFoundError {
                     gsLogger.error(getModuleName(),getRoutineName(),getLineNumber(),e.message());
                     return try! "Error: file named %s not found".format(fname);
@@ -856,15 +858,15 @@ module GenSymIO {
         use SysCTypes;
 
         var lengths: [FD] int;
-        for (i, filename) in zip(FD, filenames) {
+        for (i, filename) in zip(FD, filenames) do on Locales[i % numLocales] {
             try {
-                var file_id = C_HDF5.H5Fopen(filename.c_str(), C_HDF5.H5F_ACC_RDONLY, 
+                var file_id = C_HDF5.H5Fopen(filename.localize().c_str(), C_HDF5.H5F_ACC_RDONLY, 
                                            C_HDF5.H5P_DEFAULT);
                 var dims: [0..#1] C_HDF5.hsize_t; // Only rank 1 for now
                 var dName = try! getReadDsetName(file_id, dsetName);
 
                 // Read array length into dims[0]
-                C_HDF5.HDF5_WAR.H5LTget_dataset_info_WAR(file_id, dName.c_str(), 
+                C_HDF5.HDF5_WAR.H5LTget_dataset_info_WAR(file_id, dName.localize().c_str(), 
                                            c_ptrTo(dims), nil, nil);
                 defer {
                     /*
