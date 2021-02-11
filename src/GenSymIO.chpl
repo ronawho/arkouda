@@ -641,9 +641,9 @@ module GenSymIO {
         
         var file_id = C_HDF5.H5Fopen(filename.c_str(), 
                                          C_HDF5.H5F_ACC_RDONLY, C_HDF5.H5P_DEFAULT);
+        defer { C_HDF5.H5Fclose(file_id); } 
                                          
         if file_id < 0 { // HF5open returns negative value on failure
-            C_HDF5.H5Fclose(file_id);
             throw getErrorWithContext(
                            msg="in accessing %s HDF5 file content".format(filename),
                            lineNumber=getLineNumber(), 
@@ -655,7 +655,6 @@ module GenSymIO {
         var dName = getReadDsetName(file_id, dsetName);
 
         if !C_HDF5.H5Lexists(file_id, dName.c_str(), C_HDF5.H5P_DEFAULT) {
-            C_HDF5.H5Fclose(file_id);
             throw getErrorWithContext(
                  msg="The dataset %s does not exist in the file %s".format(dsetName, 
                                                 filename),
@@ -695,9 +694,6 @@ module GenSymIO {
             } else {
                 (dataclass, bytesize, isSigned) = get_dataset_info(file_id, dsetName);
                 isSegArray = false;
-            }
-            defer {
-                C_HDF5.H5Fclose(file_id);
             }
         } catch e : Error {
             //:TODO: recommend revisiting this catch block 
@@ -744,6 +740,7 @@ module GenSymIO {
     proc get_dataset_info(file_id, dsetName) throws {
         var dset = C_HDF5.H5Dopen(file_id, dsetName.c_str(),
                                                    C_HDF5.H5P_DEFAULT);
+        defer { C_HDF5.H5Dclose(dset); }
         if (dset < 0) {
             throw getErrorWithContext( 
                 msg="dataset %s does not exist".format(dsetName), 
@@ -753,11 +750,11 @@ module GenSymIO {
                 errorClass='DatasetNotFoundError');
         }
         var datatype = C_HDF5.H5Dget_type(dset);
+        defer { C_HDF5.H5Tclose(datatype); } 
+
         var dataclass = C_HDF5.H5Tget_class(datatype);
         var bytesize = C_HDF5.H5Tget_size(datatype):int;
         var isSigned = (C_HDF5.H5Tget_sign(datatype) == C_HDF5.H5T_SGN_2);
-        C_HDF5.H5Tclose(datatype);
-        C_HDF5.H5Dclose(dset);
         return (dataclass, bytesize, isSigned);
     }
 
@@ -828,17 +825,11 @@ module GenSymIO {
     proc isBooleanDataset(fileName: string, dsetName: string): bool throws {
         var fileId = C_HDF5.H5Fopen(fileName.c_str(), C_HDF5.H5F_ACC_RDONLY, 
                                            C_HDF5.H5P_DEFAULT);                  
+        defer { C_HDF5.H5Fclose(fileId); }
         var boolDataset: bool;
 
         try {
             boolDataset = isBooleanDataset(fileId, dsetName);
-            /*
-             * Put close function call in defer block to ensure it's invoked, 
-             * which prevents accumulation of open file descriptors
-             */
-            defer {
-                C_HDF5.H5Fclose(fileId);
-            }
         } catch e: Error {
             /*
              * If there's an actual error, print it here. :TODO: revisit this
@@ -862,19 +853,13 @@ module GenSymIO {
             try {
                 var file_id = C_HDF5.H5Fopen(filename.localize().c_str(), C_HDF5.H5F_ACC_RDONLY, 
                                            C_HDF5.H5P_DEFAULT);
+                defer { C_HDF5.H5Fclose(file_id); }
                 var dims: [0..#1] C_HDF5.hsize_t; // Only rank 1 for now
                 var dName = try! getReadDsetName(file_id, dsetName);
 
                 // Read array length into dims[0]
                 C_HDF5.HDF5_WAR.H5LTget_dataset_info_WAR(file_id, dName.localize().c_str(), 
                                            c_ptrTo(dims), nil, nil);
-                defer {
-                    /*
-                     * Put close function call in defer block to ensure it's invoked, 
-                     * which prevents accumulation of open file descriptors
-                     */
-                    C_HDF5.H5Fclose(file_id);
-                }
                 lengths[i] = dims[0]: int;
             } catch e: Error {
                 throw getErrorWithContext(
@@ -912,23 +897,22 @@ module GenSymIO {
                 /* On this locale, find all files containing data that belongs in
                  this locale's chunk of A */
                 for (filedom, filename) in zip(locFiledoms, locFiles) {
-                    var isopen = false;
                     var file_id: C_HDF5.hid_t;
                     var dataset: C_HDF5.hid_t;
                     // Look for overlap between A's local subdomains and this file
                     for locdom in A.localSubdomains() {
                         const intersection = domain_intersection(locdom, filedom);
                         if intersection.size > 0 {
-                            // Only open the file once, even if it intersects with many local subdomains
-                            if !isopen {
-                                file_id = C_HDF5.H5Fopen(filename.c_str(), C_HDF5.H5F_ACC_RDONLY, 
-                                                                                        C_HDF5.H5P_DEFAULT);  
-                                var locDsetName = try! getReadDsetName(file_id,dsetName);                                                                                                      
-                                try! dataset = C_HDF5.H5Dopen(file_id, locDsetName.c_str(), C_HDF5.H5P_DEFAULT);
-                                isopen = true;
-                            }
+                            file_id = C_HDF5.H5Fopen(filename.c_str(), C_HDF5.H5F_ACC_RDONLY, 
+                                                                                    C_HDF5.H5P_DEFAULT);  
+                            defer { C_HDF5.H5Fclose(file_id); }
+                            var locDsetName = try! getReadDsetName(file_id,dsetName);                                                                                                      
+                            try! dataset = C_HDF5.H5Dopen(file_id, locDsetName.c_str(), C_HDF5.H5P_DEFAULT);
+                            defer { C_HDF5.H5Dclose(dataset); }
+
                             // do A[intersection] = file[intersection - offset]
                             var dataspace = C_HDF5.H5Dget_space(dataset);
+                            defer { C_HDF5.H5Sclose(dataspace); } 
                             var dsetOffset = [(intersection.low - filedom.low): C_HDF5.hsize_t];
                             var dsetStride = [intersection.stride: C_HDF5.hsize_t];
                             var dsetCount = [intersection.size: C_HDF5.hsize_t];
@@ -938,6 +922,7 @@ module GenSymIO {
                             var memStride = [1: C_HDF5.hsize_t];
                             var memCount = [intersection.size: C_HDF5.hsize_t];
                             var memspace = C_HDF5.H5Screate_simple(1, c_ptrTo(memCount), nil);
+                            defer { C_HDF5.H5Sclose(memspace); } 
                             C_HDF5.H5Sselect_hyperslab(memspace, C_HDF5.H5S_SELECT_SET, c_ptrTo(memOffset), 
                                                               c_ptrTo(memStride), c_ptrTo(memCount), nil);
 
@@ -954,13 +939,7 @@ module GenSymIO {
                                         dataspace, C_HDF5.H5P_DEFAULT, 
                                         c_ptrTo(A.localSlice(intersection)));
                             }
-                            C_HDF5.H5Sclose(memspace);
-                            C_HDF5.H5Sclose(dataspace);
                         }
-                    }
-                    if isopen {
-                        C_HDF5.H5Dclose(dataset);
-                        C_HDF5.H5Fclose(file_id);
                     }
                 }
             }
@@ -981,6 +960,7 @@ module GenSymIO {
                 var filename = filenames[fileind];
                 var file_id = C_HDF5.H5Fopen(filename.c_str(), C_HDF5.H5F_ACC_RDONLY, 
                                                                        C_HDF5.H5P_DEFAULT);
+                defer { C_HDF5.H5Fclose(file_id) ;} 
                 // TODO: use select_hyperslab to read directly into a strided slice of A
                 // Read file into a temporary array and copy into the correct chunk of A
                 var AA: [1..filedom.size] A.eltType;
@@ -988,7 +968,6 @@ module GenSymIO {
                 // Retrieve the dsetName that accounts for enclosing group, if applicable
                 try! readHDF5Dataset(file_id, getReadDsetName(file_id, dsetName), AA);
                 A[filedom] = AA;
-                C_HDF5.H5Fclose(file_id);
            }
     }
 
@@ -1143,6 +1122,9 @@ module GenSymIO {
 
             var myFileID = C_HDF5.H5Fopen(myFilename.c_str(), 
                                        C_HDF5.H5F_ACC_RDWR, C_HDF5.H5P_DEFAULT);
+
+            defer { C_HDF5.H5Fclose(myFileID); }
+
             const locDom = A.localSubdomain();
             var dims: [0..#1] C_HDF5.hsize_t;
             dims[0] = locDom.size: C_HDF5.hsize_t;
@@ -1403,8 +1385,6 @@ module GenSymIO {
                     }
                 }
             
-            // Close the file now that the values and segments pdarrays have been written
-            C_HDF5.H5Fclose(myFileID);
         }
         return warnFlag;
     }
@@ -1446,6 +1426,8 @@ module GenSymIO {
 
             var myFileID = C_HDF5.H5Fopen(myFilename.c_str(), 
                                        C_HDF5.H5F_ACC_RDWR, C_HDF5.H5P_DEFAULT);
+            defer { C_HDF5.H5Fclose(myFileID); }
+
             const locDom = A.localSubdomain();
             var dims: [0..#1] C_HDF5.hsize_t;
             dims[0] = locDom.size: C_HDF5.hsize_t;
@@ -1471,8 +1453,6 @@ module GenSymIO {
             H5LTmake_dataset_WAR(myFileID, myDsetName.c_str(), 1, c_ptrTo(dims),
                                       dType, c_ptrTo(A.localSlice(locDom)));
 
-            // Close the file now that the 1..n pdarrays have been written
-            C_HDF5.H5Fclose(myFileID);
         }
         return warnFlag;
     }
@@ -1651,6 +1631,7 @@ module GenSymIO {
 
               file_id = C_HDF5.H5Fcreate(filenames[loc].c_str(), C_HDF5.H5F_ACC_TRUNC,
                                                         C_HDF5.H5P_DEFAULT, C_HDF5.H5P_DEFAULT);
+              defer { C_HDF5.H5Fclose(file_id); }
               
               prepareGroup(file_id, group);
 
@@ -1663,11 +1644,6 @@ module GenSymIO {
                                     errorClass='FileNotFoundError');
               }
 
-              /*
-               * Close the file now that it has been created and, if applicable, the 
-               * Strings group derived from the dsetName has been created.
-               */
-              C_HDF5.H5Fclose(file_id);
            }
         } else {
             throw getErrorWithContext(
@@ -1752,6 +1728,7 @@ module GenSymIO {
 
               file_id = C_HDF5.H5Fcreate(filenames[loc.id].localize().c_str(), C_HDF5.H5F_ACC_TRUNC,
                                                       C_HDF5.H5P_DEFAULT, C_HDF5.H5P_DEFAULT);
+              defer { C_HDF5.H5Fclose(file_id); }
 
               if file_id < 0 { // Negative file_id means error
                   throw getErrorWithContext(
@@ -1762,11 +1739,6 @@ module GenSymIO {
                                      errorClass='FileNotFoundError');
               }
 
-              /*
-               * Close the file now that it has been created and, if applicable, the 
-               * Strings group derived from the dsetName has been created.
-               */
-              C_HDF5.H5Fclose(file_id);
            }
         } else {
             throw getErrorWithContext(
@@ -2016,7 +1988,7 @@ module GenSymIO {
     private proc prepareGroup(fileId: int, group: string) throws {
         var groupId = C_HDF5.H5Gcreate2(fileId, "/%s".format(group).c_str(),
               C_HDF5.H5P_DEFAULT, C_HDF5.H5P_DEFAULT, C_HDF5.H5P_DEFAULT);
-        C_HDF5.H5Gclose(groupId);
+        defer { C_HDF5.H5Gclose(groupId); }
     }
     
     /*
