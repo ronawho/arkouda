@@ -27,6 +27,7 @@ module SegmentedArray {
 
   private config param useHash = true;
   param SegmentedArrayUseHash = useHash;
+  config const useHashArgsort = false;
   
   class OutOfBoundsError: Error {}
 
@@ -707,16 +708,20 @@ module SegmentedArray {
     }
 
     proc argsort(checkSorted:bool=false): [offsets.aD] int throws {
-      const ref D = offsets.aD;
-      const ref va = values.a;
-      if checkSorted && isSorted() {
-          saLogger.warn(getModuleName(),getRoutineName(),getLineNumber(),
-                                                   "argsort called on already sorted array");
-          var ranks: [D] int = [i in D] i;
-          return ranks;
+      if useHashArgsort {
+        return radixSortLSD_ranks(this.hash());
+      } else {
+        const ref D = offsets.aD;
+        const ref va = values.a;
+        if checkSorted && isSorted() {
+            saLogger.warn(getModuleName(),getRoutineName(),getLineNumber(),
+                                                     "argsort called on already sorted array");
+            var ranks: [D] int = [i in D] i;
+            return ranks;
+        }
+        var ranks = twoPhaseStringSort(this);
+        return ranks;
       }
-      var ranks = twoPhaseStringSort(this);
-      return ranks;
     }
 
   } // class SegString
