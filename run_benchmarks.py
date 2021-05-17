@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 
-benchmark_dir = os.path.dirname(__file__)
+benchmark_dir = os.path.join(os.getenv('ARKOUDA_HOME'), 'benchmarks')
 util_dir = os.path.join(benchmark_dir, '..', 'util', 'test')
 sys.path.insert(0, os.path.abspath(util_dir))
 from util import *
@@ -108,7 +108,25 @@ def main():
     if args.gen_graphs:
         os.makedirs(config_dat_dir, exist_ok=True)
 
+    # Hack to get SLURM_JOBID. Use the undocumented CHPL_LAUNCHER_REAL_WRAPPER
+    # to run a script on the compute nodes before the arkouda_server binary is
+    # run. This script prints $SLURM_JOBID to a file, which we then read here.
+    # We have to set some slurm env vars to a sentinel/dummy value to get the
+    # Chapel launcher to propagate them. Then set the launcher wrapper and tell
+    # it what filename to write to. Once the server is started, read the slurm
+    # jobid and remove any temporary files we created.
+    os.environ["SLURM_JOBID"] = "sentinel"
+    os.environ["SLURM_NODELIST"] = "sentinel"
+    os.environ["CHPL_LAUNCHER_REAL_WRAPPER"] = os.path.join(os.path.dirname(__file__), 'write_slurm_id.bash')
+    write_slurm_id_filename = "write_slurm_filename.{}".format(os.getpid())
+    os.environ["WRITE_SLURM_ID_FILENAME"] = write_slurm_id_filename
     start_arkouda_server(args.num_locales)
+    with open (write_slurm_id_filename, 'r') as f:
+        slurm_id = f.read().strip()
+    os.remove(write_slurm_id_filename)
+
+    output_filename = 'arkouda.{}.out'.format(slurm_id)
+    print('Writing benchmark output to "{}"'.format(output_filename))
 
     args.benchmarks = args.benchmarks or BENCHMARKS
     for benchmark in args.benchmarks:
@@ -117,7 +135,8 @@ def main():
             out = run_client(benchmark_py, client_args)
             if args.gen_graphs:
                 add_to_dat(benchmark, out, config_dat_dir, args.graph_infra)
-            print(out)
+            with open(output_filename, 'w') as f:
+                f.write(out)
 
     stop_arkouda_server()
 
