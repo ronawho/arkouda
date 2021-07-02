@@ -94,6 +94,7 @@ module ServerConfig
             const LocaleConfigs: [LocaleSpace] owned LocaleConfig;
             const authenticate: bool;
             const logLevel: LogLevel;
+            const byteorder: string;
         }
         var (Zmajor, Zminor, Zmicro) = ZMQ.version;
         var H5major: c_uint, H5minor: c_uint, H5micro: c_uint;
@@ -112,6 +113,7 @@ module ServerConfig
             LocaleConfigs = [loc in LocaleSpace] new owned LocaleConfig(loc),
             authenticate = authenticate,
             logLevel = logLevel
+            byteOrder = try! getByteorder();
         );
 
         return cfg;
@@ -136,6 +138,18 @@ module ServerConfig
     proc getPhysicalMemHere() {
         use MemDiagnostics;
         return here.physicalMemory();
+    }
+
+    /*
+    Get the byteorder (endianness) of this locale
+    */
+    proc getByteorder() throws {
+        use IO;
+        var writeVal = 1, readVal = 0;
+        var tmpf = openmem();
+        tmpf.writer(kind=iobig).write(writeVal);
+        tmpf.reader(kind=ionative, start=0).read(readVal);
+        return if writeVal == readVal then "big" else "little";
     }
 
     /*
