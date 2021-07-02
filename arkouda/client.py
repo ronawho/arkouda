@@ -8,7 +8,8 @@ from arkouda.logger import getArkoudaLogger
 from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
      MessageType
 
-__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok"]
+__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used",
+        "ruok", "_send_binary_message2"]
 
 # stuff for zmq connection
 pspStr = ''
@@ -334,7 +335,8 @@ def _send_string_message(cmd : str, recv_bytes : bool=False,
     socket.send_string(json.dumps(message.asdict()))
 
     if recv_bytes:
-        return_message = socket.recv()
+        frame = socket.recv(copy=False)
+        return_message = bytearray(frame.buffer)
 
         # raise errors or warnings sent back from the server
         if return_message.startswith(b"Error:"): 
@@ -357,6 +359,42 @@ def _send_string_message(cmd : str, recv_bytes : bool=False,
             raise ValueError('Return message is missing the {} field'.format(ke))
         except json.decoder.JSONDecodeError:
             raise ValueError('Return message is not valid JSON: {}'.\
+                             format(raw_message))
+def _send_binary_message2(cmd : str, payload : bytes, recv_bytes : bool=False,
+                                            args : str=None, data=None) -> Union[str, bytes]:
+
+    message = RequestMessage(user=username, token=token, cmd=cmd,
+                                format=MessageFormat.BINARY, args=cast(str,args))
+
+    logger.debug('sending message {}'.format(message))
+
+    socket.send('{}BINARY_PAYLOAD'.\
+                format(json.dumps(message.asdict())).encode() + payload, flags=zmq.SNDMORE)
+    socket.send(data)
+
+    if recv_bytes:
+        binary_return_message = cast(bytes, socket.recv())
+        # raise errors or warnings sent back from the server
+        if binary_return_message.startswith(b"Error:"): \
+                                   raise RuntimeError(binary_return_message.decode())
+        elif binary_return_message.startswith(b"Warning:"): \
+                                        warnings.warn(binary_return_message.decode())
+        return binary_return_message
+    else:
+        raw_message = socket.recv_string()
+        try:
+            return_message = ReplyMessage.fromdict(json.loads(raw_message))
+
+            # raise errors or warnings sent back from the server
+            if return_message.msgType == MessageType.ERROR:
+                raise RuntimeError(return_message.msg)
+            elif return_message.msgType == MessageType.WARNING:
+                warnings.warn(return_message.msg)
+            return return_message.msg
+        except KeyError as ke:
+            raise ValueError('Return message is missing the {} field'.format(ke))
+        except json.decoder.JSONDecodeError:
+            raise ValueError('{} is not valid JSON, may be server-side error'.\
                              format(raw_message))
 
 def _send_binary_message(cmd : str, payload : bytes, recv_bytes : bool=False,

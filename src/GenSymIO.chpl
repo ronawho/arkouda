@@ -36,13 +36,13 @@ module GenSymIO {
      * Creates a pdarray server-side and returns the SymTab name used to
      * retrieve the pdarray from the SymTab.
      */
-    proc arrayMsg(cmd: string, payload: bytes, st: borrowed SymTab): MsgTuple throws {
+    proc arrayMsg(cmd: string, payload: bytes, st: borrowed SymTab, ref data): MsgTuple throws {
         // Set up our return items
         var msgType = MsgType.NORMAL;
         var msg:string = "";
         var rname:string = "";
 
-        var (dtypeBytes, sizeBytes, data) = payload.splitMsgToTuple(b" ", 3);
+        var (dtypeBytes, sizeBytes) = payload.splitMsgToTuple(b" ", 2);
         var dtype = DType.UNDEF;
         var size:int;
         try {

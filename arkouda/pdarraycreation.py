@@ -2,7 +2,7 @@ import numpy as np # type: ignore
 import pandas as pd # type: ignore
 from typing import cast, Iterable, Optional, Union
 from typeguard import typechecked
-from arkouda.client import generic_msg
+from arkouda.client import generic_msg, _send_binary_message2
 from arkouda.dtypes import NUMBER_FORMAT_STRINGS, float64, int64, \
      DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes,\
     int_scalars, numeric_scalars, get_byteorder, get_server_byteorder
@@ -210,9 +210,9 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
         (get_byteorder(a.dtype) == '>' and get_server_byteorder() == 'little')):
         abytes = a.byteswap().tobytes()
     else:
-        abytes = a.tobytes()
-    req_msg = "{} {:n} ".  format(a.dtype.name, size).encode() + abytes
-    repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True)
+        abytes = memoryview(a)
+    req_msg = "{} {:n} ".  format(a.dtype.name, size).encode()
+    repMsg = _send_binary_message2(cmd='array', payload=req_msg, data=abytes)
     return create_pdarray(repMsg)
 
 def zeros(size : int_scalars, dtype : type=np.float64) -> pdarray:
