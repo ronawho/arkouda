@@ -294,7 +294,10 @@ proc main() {
 
             select cmd
             {
-                when "array"             {repTuple = arrayMsg(cmd, payload, st);}
+                when "array"             {
+                  var arrBytes = socket.recv(bytes);
+                  repTuple = arrayMsg(cmd, payload, st, arrBytes);
+                }
                 when "tondarray"         {binaryRepMsg = tondarrayMsg(cmd, args, st);}
                 when "cast"              {repTuple = castMsg(cmd, args, st);}
                 when "mink"              {repTuple = minkMsg(cmd, args, st);}

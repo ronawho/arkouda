@@ -863,7 +863,7 @@ class pdarray:
             dt = dt.newbyteorder('>')
         else:
             dt = dt.newbyteorder('<')
-        return np.frombuffer(rep_msg, dt).copy()
+        return np.frombuffer(rep_msg, dt)
 
     def to_cuda(self):
         """
