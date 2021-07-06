@@ -3,7 +3,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json
 import numpy as np # type: ignore
-from arkouda.client import generic_msg
+from arkouda.client import generic_msg, _send_string_message2
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
      translate_np_dtype, NUMBER_FORMAT_STRINGS, \
      int_scalars, numeric_scalars, numpy_scalars, get_server_byteorder
@@ -851,7 +851,7 @@ class pdarray:
             raise RuntimeError(('Array exceeds allowed size for transfer. Increase ' +
                                'client.maxTransferBytes to allow'))
         # The reply from the server will be a bytes object
-        rep_msg = generic_msg(cmd="tondarray", args="{}".format(self.name), recv_bytes=True)
+        rep_msg = _send_string_message2(cmd="tondarray", args="{}".format(self.name), recv_bytes=True)
         # Make sure the received data has the expected length
         if len(rep_msg) != self.size*self.dtype.itemsize:
             raise RuntimeError("Expected {} bytes but received {}".\
