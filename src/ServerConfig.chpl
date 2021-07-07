@@ -112,8 +112,8 @@ module ServerConfig
             distributionType = (makeDistDom(10).type):string,
             LocaleConfigs = [loc in LocaleSpace] new owned LocaleConfig(loc),
             authenticate = authenticate,
-            logLevel = logLevel
-            byteOrder = try! getByteorder();
+            logLevel = logLevel,
+            byteOrder = try! getByteorder()
         );
 
         return cfg;
