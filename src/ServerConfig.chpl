@@ -113,7 +113,7 @@ module ServerConfig
             LocaleConfigs = [loc in LocaleSpace] new owned LocaleConfig(loc),
             authenticate = authenticate,
             logLevel = logLevel,
-            byteOrder = try! getByteorder()
+            byteorder = try! getByteorder()
         );
 
         return cfg;
