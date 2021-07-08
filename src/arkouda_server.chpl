@@ -153,12 +153,51 @@ proc main() {
     t1.clear();
     t1.start();
 
+
+    use ZMQ;
+    /* Send, taking ownership of the bytes */
+    proc Socket.sendOwned(ref data: ?T, flags: int = 0) throws where isBytes(T) {
+      use CPtr;
+      extern const ZMQ_DONTWAIT: c_int;
+      extern proc chpl_macro_int_errno():c_int;
+      inline proc errno return chpl_macro_int_errno():c_int;
+
+      extern proc zmq_msg_init_data(ref msg: zmq_msg_t,
+                                    data: c_void_ptr,
+                                    size: size_t,
+                                    ffn: c_fn_ptr,
+                                    hint: c_void_ptr): c_int;
+      extern proc zmq_msg_send(ref msg: zmq_msg_t, sock: c_void_ptr,
+                               flags: c_int): c_int;
+      on classRef.home {
+        data.isOwned = false;
+
+        // Create the ZeroMQ message from the data buffer
+        var msg: zmq_msg_t;
+        if (0 != zmq_msg_init_data(msg, data.c_str():c_void_ptr,
+                                   data.numBytes:size_t, c_ptrTo(free_helper),
+                                   c_nil)) {
+          try throw_socket_error(errno, "send");
+        }
+
+        // Send the message
+        while(-1 == zmq_msg_send(msg, classRef.socket,
+                                 (ZMQ_DONTWAIT | flags):c_int)) {
+          if errno == EAGAIN then
+            chpl_task_yield();
+          else {
+            try throw_socket_error(errno, "send");
+          }
+        }
+      }
+    }
+
     /*
     Following processing of incoming message, sends a message back to the client.
 
     :arg repMsg: either a string or bytes to be sent
     */
-    proc sendRepMsg(repMsg: ?t) throws where t==string || t==bytes {
+    proc sendRepMsg(repMsg: ?t) throws where t==string {
         repCount += 1;
         if trace {
           if t==bytes {
@@ -171,6 +210,20 @@ proc main() {
         }
         socket.send(repMsg);
     }
+    proc sendRepMsg(ref repMsg: ?t) throws where t==bytes {
+        repCount += 1;
+        if trace {
+          if t==bytes {
+              asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
+                                                        "repMsg: <binary-data>");
+          } else {
+              asLogger.info(getModuleName(),getRoutineName(),getLineNumber(), 
+                                                        "repMsg: %s".format(repMsg));
+          }
+        }
+        socket.sendOwned(repMsg);
+    }
+
 
     /*
     Compares the token submitted by the user with the arkouda_server token. If the
@@ -289,7 +342,6 @@ proc main() {
              * applicable, and sent to sendRepMsg depending upon whether a string (repTuple)
              * or bytes (binaryRepMsg) is to be returned.
              */
-            var binaryRepMsg: bytes;
             var repTuple: MsgTuple;
 
             select cmd
@@ -298,7 +350,10 @@ proc main() {
                   var arrBytes = socket.recv(bytes);
                   repTuple = arrayMsg(cmd, payload, st, arrBytes);
                 }
-                when "tondarray"         {binaryRepMsg = tondarrayMsg(cmd, args, st);}
+                when "tondarray"         {
+                  var binaryRepMsg = tondarrayMsg(cmd, args, st);
+                  sendRepMsg(binaryRepMsg);
+                }
                 when "cast"              {repTuple = castMsg(cmd, args, st);}
                 when "mink"              {repTuple = minkMsg(cmd, args, st);}
                 when "maxk"              {repTuple = maxkMsg(cmd, args, st);}
@@ -401,7 +456,6 @@ proc main() {
              */          
             if repTuple.msg.isEmpty() {
                 // Since the repTuple.msg attribute is empty, this is a binary reply message
-                sendRepMsg(binaryRepMsg);
             } else {
                 sendRepMsg(serialize(msg=repTuple.msg,msgType=repTuple.msgType,
                                                               msgFormat=MsgFormat.STRING, user=user));
