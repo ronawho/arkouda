@@ -679,7 +679,7 @@ def get_config() -> Mapping[str, Union[str, int, float]]:
     """
 
     if serverConfig is None:
-        raise RuntimeError('Not connected to a server')
+        raise RuntimeError("client is not connected to a server")
 
     return serverConfig
 
