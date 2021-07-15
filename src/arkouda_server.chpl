@@ -289,7 +289,6 @@ proc main() {
              * applicable, and sent to sendRepMsg depending upon whether a string (repTuple)
              * or bytes (binaryRepMsg) is to be returned.
              */
-            var binaryRepMsg: bytes;
             var repTuple: MsgTuple;
 
             select cmd
@@ -298,7 +297,10 @@ proc main() {
                   var arrBytes = socket.recv(bytes);
                   repTuple = arrayMsg(cmd, payload, st, arrBytes);
                 }
-                when "tondarray"         {binaryRepMsg = tondarrayMsg(cmd, args, st);}
+                when "tondarray"         {
+                  var binaryRepMsg = tondarrayMsg(cmd, args, st);
+                  sendRepMsg(binaryRepMsg);
+                }
                 when "cast"              {repTuple = castMsg(cmd, args, st);}
                 when "mink"              {repTuple = minkMsg(cmd, args, st);}
                 when "maxk"              {repTuple = maxkMsg(cmd, args, st);}
@@ -404,7 +406,6 @@ proc main() {
              */          
             if repTuple.msg.isEmpty() {
                 // Since the repTuple.msg attribute is empty, this is a binary reply message
-                sendRepMsg(binaryRepMsg);
             } else {
                 sendRepMsg(serialize(msg=repTuple.msg,msgType=repTuple.msgType,
                                                               msgFormat=MsgFormat.STRING, user=user));
